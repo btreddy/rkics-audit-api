@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.streamlit/
+data/*.db
+data/*.db-*
+backups/*
+!backups/.gitkeep
+data/
