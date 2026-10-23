@@ -29,9 +29,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path("data/site_audit_uploads")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR = DATA_DIR / "site_audit_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = Path("data/sales_os.db")
+DB_PATH = DATA_DIR / "sales_os.db"
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "free-site-audit.html"
 
@@ -734,9 +737,10 @@ def save_lead_to_db(lead_code: str, name: str, phone: str, location: str, projec
         cur.execute("""
             INSERT INTO leads (
                 lead_code, name, developer, location, project_type, stage,
-                source, source_url, discovered_date, cluster, estimated_value,
-                builtup_area_sqft, review_status, quality_score, notes, imported_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                rera_number, address, source, source_url, discovered_date,
+                cluster, estimated_value, builtup_area_sqft, review_status,
+                quality_score, notes, imported_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             lead_code,
             f"{project_type} - {name}",
@@ -744,6 +748,8 @@ def save_lead_to_db(lead_code: str, name: str, phone: str, location: str, projec
             f"{location}, Hyderabad",
             project_type,
             stage,
+            "",
+            f"{location}, Hyderabad",
             "Website Free Audit",
             f"file://data/site_audit_uploads/{image_filename}",
             date.today().isoformat(),
@@ -771,6 +777,25 @@ async def serve_audit_page():
         except Exception:
             pass
     return HTMLResponse(content=EMBEDDED_HTML)
+
+@app.get("/api/leads")
+async def get_captured_leads():
+    """Endpoint for local Streamlit CRM to pull all inbound leads from cloud server."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cols = [
+            'id', 'lead_code', 'name', 'developer', 'location', 'project_type', 'stage',
+            'rera_number', 'address', 'source', 'source_url', 'discovered_date',
+            'cluster', 'estimated_value', 'builtup_area_sqft', 'review_status',
+            'quality_score', 'notes', 'imported_at'
+        ]
+        rows = cur.execute(f"SELECT {', '.join(cols)} FROM leads ORDER BY imported_at DESC;").fetchall()
+        conn.close()
+        leads_list = [dict(zip(cols, r)) for r in rows]
+        return JSONResponse({"status": "success", "count": len(leads_list), "leads": leads_list})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e), "count": 0, "leads": []})
 
 @app.post("/api/site-audit")
 async def handle_site_audit(
