@@ -36,6 +36,46 @@ UPLOAD_DIR = DATA_DIR / "site_audit_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "sales_os.db"
 BASE_DIR = Path(__file__).resolve().parent
+def init_db():
+    """Ensure SQLite database and leads table exist on server startup."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_code VARCHAR(50) UNIQUE,
+                name VARCHAR(250) NOT NULL,
+                developer VARCHAR(250) NOT NULL,
+                location VARCHAR(250) NOT NULL,
+                project_type VARCHAR(100) NOT NULL,
+                stage VARCHAR(100) NOT NULL,
+                rera_number VARCHAR(120) NOT NULL DEFAULT '',
+                address VARCHAR(500) NOT NULL DEFAULT '',
+                source VARCHAR(120) NOT NULL DEFAULT 'Website Free Audit',
+                source_url VARCHAR(700) NOT NULL DEFAULT '',
+                discovered_date DATE,
+                cluster VARCHAR(120) NOT NULL DEFAULT '',
+                estimated_value FLOAT NOT NULL DEFAULT 0,
+                builtup_area_sqft FLOAT NOT NULL DEFAULT 0,
+                latitude FLOAT,
+                longitude FLOAT,
+                review_status VARCHAR(40) NOT NULL DEFAULT 'Pending',
+                duplicate_of INTEGER,
+                quality_score INTEGER NOT NULL DEFAULT 90,
+                notes TEXT NOT NULL DEFAULT '',
+                imported_at DATETIME NOT NULL
+            );
+        """)
+        conn.commit()
+        conn.close()
+        print("[✓] Initialized leads table in SQLite database.")
+    except Exception as e:
+        print(f"[!] Error initializing database: {e}")
+
+# Call init_db immediately
+init_db()
+
 HTML_FILE = BASE_DIR / "free-site-audit.html"
 
 EMBEDDED_HTML = """<!DOCTYPE html>
@@ -781,6 +821,7 @@ async def serve_audit_page():
 @app.get("/api/leads")
 async def get_captured_leads():
     """Endpoint for local Streamlit CRM to pull all inbound leads from cloud server."""
+    init_db()
     try:
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
